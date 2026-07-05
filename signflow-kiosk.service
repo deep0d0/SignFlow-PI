@@ -1,0 +1,16 @@
+[Unit]
+Description=SignFlow display kiosk (Chromium)
+After=signflow.service
+Requires=signflow.service
+
+[Service]
+Type=simple
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/opt/signflow/deploy/signflow-kiosk.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

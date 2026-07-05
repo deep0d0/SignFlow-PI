@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import { fileURLToPath } from "node:url";
 
+import "./patch-pi-server.mjs";
+
 const shared = {
   bundle: true,
   platform: "node",

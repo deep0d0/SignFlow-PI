@@ -5,5 +5,12 @@
 
 import { startConfigServer } from "./services/config-server.js";
 
-console.log("[signflow] Starting Pi server…");
-await startConfigServer();
+async function main(): Promise<void> {
+  console.log("[signflow] Starting Pi server…");
+  await startConfigServer();
+}
+
+main().catch((err) => {
+  console.error("[signflow] Fatal error:", err);
+  process.exit(1);
+});

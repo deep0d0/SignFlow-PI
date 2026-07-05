@@ -27,12 +27,13 @@ Replace `192.168.x.x` with your Pi’s IP address.
 After flashing **Raspberry Pi OS Lite (64-bit)** or **DietPi** to your SSD and SSH’ing in:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/deep0d0/SignFlow-PI/main/deploy/install-pi.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/deep0d0/SignFlow-PI/main/deploy/install-pi.sh | sudo bash -s -- --user dietpi
 ```
 
-Or, if you already cloned the repo on the Pi:
+Or SSH as `dietpi` and run from a cloned repo:
 
 ```bash
+ssh dietpi@<pi-ip>
 cd SignFlow-PI
 sudo bash deploy/install-pi.sh
 ```
@@ -44,9 +45,12 @@ The script will:
 3. Enable **4K @ 60 Hz** in boot config (`hdmi_enable_4kp60=1`)
 4. Enable **console autologin** and disable unused services (Bluetooth, Avahi)
 5. Clone or update **`https://github.com/deep0d0/SignFlow-PI`** into `/opt/signflow`
-6. Run **`npm ci`** and **`npm run build:pi-deploy`** on the Pi
-7. Install and start the **`signflow`** systemd service (port **8773**, LAN-accessible)
-8. Configure **Chromium kiosk** autostart on the display
+6. Install with **`package.pi.json`** only (no Electron — avoids deprecated `electron-builder` deps)
+7. Run **`npm run build:pi-deploy`** on the Pi
+8. Install and start the **`signflow`** systemd service (port **8773**, LAN-accessible)
+9. Configure **Chromium kiosk** autostart on the display
+
+> **npm deprecation warnings on Pi:** If you see warnings about `rimraf`, `glob`, `npmlog`, `boolean`, etc., the install is still using the desktop `package-lock.json` or full `package.json` with Electron. Re-run the installer (v4+) or manually: `cp package.pi.json package.json && rm -rf node_modules package-lock.json && npm install`.
 
 Then reboot:
 
@@ -60,7 +64,7 @@ sudo reboot
 sudo bash deploy/install-pi.sh --update       # pull latest + rebuild + restart service
 sudo bash deploy/install-pi.sh --no-4k        # skip 4K60 boot config
 sudo bash deploy/install-pi.sh --skip-kiosk   # server only (no fullscreen display)
-sudo bash deploy/install-pi.sh --user pi      # kiosk / autologin user (default: your SSH user)
+sudo bash deploy/install-pi.sh --user pi      # kiosk user (auto-detects dietpi on DietPi)
 sudo bash deploy/install-pi.sh --prune        # remove devDependencies after build (saves disk)
 ```
 
