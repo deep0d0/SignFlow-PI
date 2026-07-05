@@ -17,7 +17,7 @@
 #
 set -euo pipefail
 
-INSTALLER_VERSION=2
+INSTALLER_VERSION=3
 
 REPO_URL="${SIGNFLOW_REPO_URL:-https://github.com/deep0d0/SignFlow-PI.git}"
 REPO_BRANCH="${SIGNFLOW_REPO_BRANCH:-main}"
@@ -246,10 +246,16 @@ clone_or_update_repo() {
 
 build_signflow() {
   log "Building SignFlow on Pi (this may take several minutes)…"
-  local build_cmd="npm run build:pi-deploy"
-  if ! grep -q '"build:pi-deploy"' "$INSTALL_DIR/package.json" 2>/dev/null; then
-    warn "build:pi-deploy not in package.json; falling back to build:all"
-    build_cmd="npm run build:all"
+
+  local npm_install="npm ci"
+  local pkg="$INSTALL_DIR/package.json"
+
+  if [[ -f "$INSTALL_DIR/package.pi.json" ]]; then
+    log "Using package.pi.json (skips Electron — faster install, no deprecated electron-builder deps)"
+    cp "$pkg" "$INSTALL_DIR/package.desktop.json"
+    cp "$INSTALL_DIR/package.pi.json" "$pkg"
+    rm -rf "$INSTALL_DIR/node_modules"
+    npm_install="npm install"
   fi
 
   sudo -u "$KIOSK_USER" env \
@@ -257,7 +263,7 @@ build_signflow() {
     NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}" \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
-    bash -c "cd '$INSTALL_DIR' && npm ci && $build_cmd"
+    bash -c "cd '$INSTALL_DIR' && $npm_install && npm run build:pi-deploy"
 
   if [[ "$PRUNE_DEV" == true ]]; then
     log "Pruning devDependencies to save disk space…"
