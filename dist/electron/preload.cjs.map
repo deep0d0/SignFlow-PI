@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../electron/preload.ts"],
+  "sourcesContent": ["import { contextBridge, ipcRenderer } from \"electron\";\n\nimport type { SignageState } from \"../main/services/signage-store.js\";\n\ncontextBridge.exposeInMainWorld(\"electronAPI\", {\n  getSignageState: (): Promise<SignageState> => ipcRenderer.invoke(\"signage:getState\"),\n  onSignageChanged: (callback: (state: SignageState) => void): (() => void) => {\n    const handler = (_event: Electron.IpcRendererEvent, state: SignageState) => {\n      callback(state);\n    };\n    ipcRenderer.on(\"signage:changed\", handler);\n    return () => {\n      ipcRenderer.removeListener(\"signage:changed\", handler);\n    };\n  },\n});\n"],
+  "mappings": ";;;AAAA,sBAA2C;AAI3C,8BAAc,kBAAkB,eAAe;AAAA,EAC7C,iBAAiB,MAA6B,4BAAY,OAAO,kBAAkB;AAAA,EACnF,kBAAkB,CAAC,aAA0D;AAC3E,UAAM,UAAU,CAAC,QAAmC,UAAwB;AAC1E,eAAS,KAAK;AAAA,IAChB;AACA,gCAAY,GAAG,mBAAmB,OAAO;AACzC,WAAO,MAAM;AACX,kCAAY,eAAe,mBAAmB,OAAO;AAAA,IACvD;AAAA,EACF;AACF,CAAC;",
+  "names": []
+}

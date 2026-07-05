@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@source "./main/**/*.{ts,tsx}";
+@source "./components/**/*.{ts,tsx}";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #000;
+}
