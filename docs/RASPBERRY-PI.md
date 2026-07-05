@@ -22,6 +22,60 @@ Replace `192.168.x.x` with your Pi’s IP address.
 
 ---
 
+## One-command install (recommended)
+
+After flashing **Raspberry Pi OS Lite (64-bit)** or **DietPi** to your SSD and SSH’ing in:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/deep0d0/SignFlow-PI/main/deploy/install-pi.sh | sudo bash
+```
+
+Or, if you already cloned the repo on the Pi:
+
+```bash
+cd SignFlow-PI
+sudo bash deploy/install-pi.sh
+```
+
+The script will:
+
+1. Install system packages (Chromium, X11, Openbox, fonts, git, build tools)
+2. Install **Node.js 20 LTS**
+3. Enable **4K @ 60 Hz** in boot config (`hdmi_enable_4kp60=1`)
+4. Enable **console autologin** and disable unused services (Bluetooth, Avahi)
+5. Clone or update **`https://github.com/deep0d0/SignFlow-PI`** into `/opt/signflow`
+6. Run **`npm ci`** and **`npm run build:pi-deploy`** on the Pi
+7. Install and start the **`signflow`** systemd service (port **8773**, LAN-accessible)
+8. Configure **Chromium kiosk** autostart on the display
+
+Then reboot:
+
+```bash
+sudo reboot
+```
+
+### Install script options
+
+```bash
+sudo bash deploy/install-pi.sh --update       # pull latest + rebuild + restart service
+sudo bash deploy/install-pi.sh --no-4k        # skip 4K60 boot config
+sudo bash deploy/install-pi.sh --skip-kiosk   # server only (no fullscreen display)
+sudo bash deploy/install-pi.sh --user pi      # kiosk / autologin user (default: your SSH user)
+sudo bash deploy/install-pi.sh --prune        # remove devDependencies after build (saves disk)
+```
+
+Environment overrides:
+
+```bash
+SIGNFLOW_REPO_URL=https://github.com/deep0d0/SignFlow-PI.git \
+SIGNFLOW_REPO_BRANCH=main \
+sudo bash deploy/install-pi.sh
+```
+
+The sections below describe the same steps manually if you prefer to configure things by hand.
+
+---
+
 ## Hardware checklist
 
 - Raspberry Pi **4B** (4 GB RAM recommended)
@@ -374,18 +428,15 @@ Expected boot timeline with SSD:
 
 ## Updating SignFlow
 
-On your dev machine:
-
 ```bash
-npm run build:all
-rsync -av --exclude node_modules ./ pi@192.168.1.50:/opt/signflow/
+cd /opt/signflow && npm run build:pi-deploy
+sudo systemctl restart signflow
 ```
 
-On the Pi:
+Or re-run the installer in update mode:
 
 ```bash
-sudo systemctl restart signflow
-# Kiosk picks up changes on next page load; server restart is enough for API/display assets
+sudo bash /opt/signflow/deploy/install-pi.sh --update
 ```
 
 ---
@@ -423,7 +474,7 @@ echo $DISPLAY
 Run on the Pi:
 
 ```bash
-cd /opt/signflow && npm run build:all
+cd /opt/signflow && npm run build:pi-deploy
 sudo systemctl restart signflow
 ```
 
@@ -472,8 +523,9 @@ sudo systemctl start signflow
 ## Build commands (development machine)
 
 ```bash
-npm run build:all    # Electron build + renderer + Pi server
-npm run start:pi     # Run Pi server locally (no Electron)
+npm run build:all        # Mac/desktop: Electron + renderer + Pi server
+npm run build:pi-deploy  # Pi/Linux: renderer + Pi server only (no Electron)
+npm run start:pi         # Run Pi server locally (no Electron)
 ```
 
 Local test in a browser:

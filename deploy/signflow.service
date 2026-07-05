@@ -11,7 +11,7 @@ WorkingDirectory=/opt/signflow
 Environment=SIGNFLOW_APP_ROOT=/opt/signflow
 Environment=SIGNFLOW_DATA_DIR=/var/lib/signflow
 Environment=SIGNFLOW_BIND_HOST=0.0.0.0
-ExecStart=/usr/bin/node /opt/signflow/dist/pi/server.cjs
+ExecStart=/usr/bin/env node /opt/signflow/dist/pi/server.cjs
 Restart=always
 RestartSec=3
 

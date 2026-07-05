@@ -9,6 +9,7 @@
     "build:electron": "node scripts/build-electron.mjs",
     "build:renderer": "vite build",
     "build:pi": "node scripts/build-pi.mjs",
+    "build:pi-deploy": "npm run build:renderer && npm run build:pi",
     "build": "npm run build:electron && npm run build:renderer",
     "build:all": "npm run build && npm run build:pi",
     "dev": "node scripts/dev.mjs",
