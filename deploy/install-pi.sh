@@ -6,7 +6,7 @@
 # builds on-device, and configures systemd + Chromium kiosk autostart.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/deep0d0/SignFlow-PI/main/deploy/install-pi.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/deep0d0/SignFlow-PI/main/deploy/install-pi.sh | sudo bash -s -- --user dietpi
 #
 # Or from a cloned repo:
 #   sudo bash deploy/install-pi.sh
@@ -16,6 +16,8 @@
 #   sudo bash deploy/install-pi.sh --user dietpi      # kiosk user (auto-detected on DietPi)
 #
 set -euo pipefail
+
+INSTALLER_VERSION=2
 
 REPO_URL="${SIGNFLOW_REPO_URL:-https://github.com/deep0d0/SignFlow-PI.git}"
 REPO_BRANCH="${SIGNFLOW_REPO_BRANCH:-main}"
@@ -27,7 +29,7 @@ ENABLE_4K=true
 SKIP_KIOSK=false
 UPDATE_ONLY=false
 PRUNE_DEV=false
-KIOSK_USER=""
+KIOSK_USER="${SIGNFLOW_KIOSK_USER:-}"
 
 log() { printf '\n[signflow-install] %s\n' "$*"; }
 warn() { printf '\n[signflow-install] WARNING: %s\n' "$*" >&2; }
@@ -59,26 +61,54 @@ require_root() {
   [[ "${EUID:-$(id -u)}" -eq 0 ]] || die "Run as root: sudo bash $0"
 }
 
+is_dietpi() {
+  [[ -f /boot/dietpi/.dietpi_version ]] \
+    || [[ -f /etc/dietpi/.dietpi_version ]] \
+    || [[ -d /etc/dietpi ]]
+}
+
+user_exists() {
+  getent passwd "$1" &>/dev/null
+}
+
+first_login_user() {
+  getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $1 != "nobody" { print $1; exit }'
+}
+
 detect_kiosk_user() {
+  log "Installer v${INSTALLER_VERSION}"
+
+  # DietPi default when nothing else specified (curl | sudo bash has no SUDO_USER)
+  if [[ -z "$KIOSK_USER" ]] && is_dietpi; then
+    KIOSK_USER="dietpi"
+  fi
+
   if [[ -n "$KIOSK_USER" ]]; then
-    id "$KIOSK_USER" &>/dev/null || die "User not found: $KIOSK_USER"
+    user_exists "$KIOSK_USER" || die "User not found: $KIOSK_USER"
+    log "Using kiosk user: $KIOSK_USER"
     return
   fi
 
-  # Prefer the user who invoked sudo (ssh dietpi@pi → sudo bash)
-  if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
-    KIOSK_USER="$SUDO_USER"
-  # curl | sudo bash has no SUDO_USER — pick the distro default login user
-  elif id dietpi &>/dev/null; then
-    KIOSK_USER="dietpi"
-  elif id pi &>/dev/null; then
-    KIOSK_USER="pi"
-  else
-    die "Could not detect kiosk user. Pass --user <name> (e.g. --user dietpi)"
-  fi
+  local candidates=()
+  [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]] && candidates+=("$SUDO_USER")
+  candidates+=("dietpi" "pi")
+  local fallback
+  fallback="$(first_login_user)"
+  [[ -n "$fallback" ]] && candidates+=("$fallback")
 
-  id "$KIOSK_USER" &>/dev/null || die "User not found: $KIOSK_USER"
-  log "Using kiosk user: $KIOSK_USER"
+  local u
+  for u in "${candidates[@]}"; do
+    [[ -z "$u" ]] && continue
+    if user_exists "$u"; then
+      KIOSK_USER="$u"
+      log "Using kiosk user: $KIOSK_USER"
+      return
+    fi
+  done
+
+  warn "Could not auto-detect kiosk user. Login users on this system:"
+  getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print "  - " $1 }' >&2 || true
+  die "Pass --user <name>  (DietPi: sudo bash -s -- --user dietpi)"
 }
 
 boot_config_file() {
