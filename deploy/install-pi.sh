@@ -13,7 +13,7 @@
 #   sudo bash deploy/install-pi.sh --update          # pull latest + rebuild
 #   sudo bash deploy/install-pi.sh --no-4k             # skip 4K60 boot config
 #   sudo bash deploy/install-pi.sh --skip-kiosk        # server only, no display kiosk
-#   sudo bash deploy/install-pi.sh --user pi           # kiosk / autologin user (default: invoking user or pi)
+#   sudo bash deploy/install-pi.sh --user dietpi      # kiosk user (auto-detected on DietPi)
 #
 set -euo pipefail
 
@@ -61,16 +61,24 @@ require_root() {
 
 detect_kiosk_user() {
   if [[ -n "$KIOSK_USER" ]]; then
+    id "$KIOSK_USER" &>/dev/null || die "User not found: $KIOSK_USER"
     return
   fi
+
+  # Prefer the user who invoked sudo (ssh dietpi@pi → sudo bash)
   if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
     KIOSK_USER="$SUDO_USER"
+  # curl | sudo bash has no SUDO_USER — pick the distro default login user
+  elif id dietpi &>/dev/null; then
+    KIOSK_USER="dietpi"
   elif id pi &>/dev/null; then
     KIOSK_USER="pi"
   else
-    die "Could not detect kiosk user. Pass --user <name>"
+    die "Could not detect kiosk user. Pass --user <name> (e.g. --user dietpi)"
   fi
+
   id "$KIOSK_USER" &>/dev/null || die "User not found: $KIOSK_USER"
+  log "Using kiosk user: $KIOSK_USER"
 }
 
 boot_config_file() {
@@ -98,8 +106,9 @@ install_apt_packages() {
     xinit \
     openbox \
     unclutter \
-    raspi-config \
     build-essential
+  # raspi-config exists on Raspberry Pi OS but not on DietPi
+  apt-get install -y raspi-config 2>/dev/null || true
 }
 
 install_node() {
@@ -151,18 +160,34 @@ configure_4k() {
   fi
 }
 
+configure_autologin() {
+  log "Enabling console autologin for user $KIOSK_USER"
+
+  if command -v raspi-config >/dev/null 2>&1; then
+    # B2 = console autologin on Raspberry Pi OS
+    raspi-config nonint do_boot_behaviour B2 2>/dev/null && return
+    warn "raspi-config autologin failed — trying systemd drop-in"
+  fi
+
+  # DietPi / generic Debian: autologin via getty drop-in
+  local dropin_dir="/etc/systemd/system/getty@tty1.service.d"
+  mkdir -p "$dropin_dir"
+  cat >"$dropin_dir/autologin.conf" <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${KIOSK_USER} --noclear %I \$TERM
+EOF
+  systemctl daemon-reload
+  log "Configured systemd autologin on tty1 for $KIOSK_USER"
+}
+
 configure_boot_optimizations() {
   log "Applying optional boot optimizations…"
   systemctl disable bluetooth.service 2>/dev/null || true
   systemctl disable hciuart.service 2>/dev/null || true
   systemctl disable avahi-daemon.service 2>/dev/null || true
 
-  if command -v raspi-config >/dev/null 2>&1; then
-    log "Enabling console autologin for user $KIOSK_USER"
-    # B2 = console autologin (user still needs startx in profile for kiosk)
-    raspi-config nonint do_boot_behaviour B2 2>/dev/null || \
-      warn "raspi-config autologin failed — set manually: sudo raspi-config"
-  fi
+  configure_autologin
 }
 
 setup_signflow_user() {
